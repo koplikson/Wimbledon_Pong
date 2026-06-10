@@ -68,6 +68,7 @@ var canvas=document.getElementById('c');
 var ctx=canvas.getContext('2d');
 var GW=900,GH=560,SH=64;
 var CY=SH,CH=GH-SH,NETX=GW/2,MG=16;
+var MC_PH=340,MC_PY=CY+(CH-MC_PH)/2-10;
 var SC=1;
 var isMobile=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 var TPAD_H=isMobile?90:0;
@@ -89,6 +90,9 @@ function resize(){
 window.addEventListener('resize',resize);
 window.addEventListener('orientationchange',function(){setTimeout(resize,300);});
 resize();
+
+// ── Backend config ─────────────────────────────
+var API_BASE='https://YOUR-RAILWAY-APP.up.railway.app';
 
 // ── Colours ───────────────────────────────────
 var C={
@@ -129,6 +133,26 @@ function giveSet(w){
   w==='p1'?sc.p1Sets++:sc.p2Sets++;
   if(sc.p1Sets>=2||sc.p2Sets>=2)return'match';
   return'set';
+}
+
+// ── Arcade score (1P only) ─────────────────────
+var arcade;
+function mkArcade(){return{score:0,p1Streak:0,p2Streak:0};}
+arcade=mkArcade();
+function streakMultiplier(streak){
+  if(streak>=6)return 5;
+  if(streak>=3)return 3;
+  return 1;
+}
+function applyArcadePoint(who){
+  if(MODE!=='1p')return;
+  if(who==='p1'){
+    arcade.p1Streak++;arcade.p2Streak=0;
+    arcade.score+=10*streakMultiplier(arcade.p1Streak);
+  }else{
+    arcade.p2Streak++;arcade.p1Streak=0;
+    arcade.score-=10*streakMultiplier(arcade.p2Streak);
+  }
 }
 
 // ── Paddles ───────────────────────────────────
@@ -211,9 +235,12 @@ function hitPad(p,isLeft){
 var STATE='menu',MODE='1p';
 var ptTimer=0,ptMsg='',ptSub='',ptNext='playing',setEndTimer=0;
 var matchEndBtnRect=null;
+var leaderboardCache=null,leaderboardFetchState='idle',arcadeSubmitted=false;
+var nameInputEl=null,submitBtnEl=null,leaderboardDiv=null;
 
 function startPlaying(){STATE='playing';resetPads();launchBall(Math.random()<0.5?'p1':'p2');}
 function onPoint(who){
+  applyArcadePoint(who);
   var r=givePoint(who);
   var wname=who==='p1'?'Player 1':'Player 2';
   ptMsg=(who==='p1'?'◀  ':'▶  ')+wname+' scores';
@@ -223,6 +250,140 @@ function onPoint(who){
   if(r==='set'){ptMsg+=' — Set!';var h=sc.hist[sc.hist.length-1];ptSub='Set: '+h.p1+' – '+h.p2;pause=90;ptNext='setEnd';}
   if(r==='match'){ptNext='matchEnd';pause=9999;}
   STATE='pointEnd';ptTimer=pause;resetPads();launchBall(who==='p1'?'p2':'p1');
+}
+
+// ── Leaderboard ────────────────────────────────
+function fetchLeaderboard(limit){
+  return fetch(API_BASE+'/api/scores?limit='+limit).then(function(r){return r.json();});
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function onEnterMatchEnd(){
+  arcadeSubmitted=false;
+  leaderboardCache=null;leaderboardFetchState='idle';
+  removeNameEntryUI();
+  if(MODE!=='1p')return;
+  leaderboardFetchState='loading';
+  fetchLeaderboard(10).then(function(data){
+    leaderboardCache=data;leaderboardFetchState='done';
+    maybeShowNameEntry();
+  }).catch(function(){leaderboardFetchState='error';});
+}
+function qualifiesForTop10(){
+  if(!leaderboardCache)return true;
+  if(leaderboardCache.length<10)return true;
+  var lowest=leaderboardCache[leaderboardCache.length-1].score;
+  return arcade.score>lowest;
+}
+function maybeShowNameEntry(){
+  if(MODE!=='1p'||arcadeSubmitted)return;
+  if(!qualifiesForTop10())return;
+  showNameEntryUI();
+}
+function showNameEntryUI(){
+  if(nameInputEl)return;
+  nameInputEl=document.createElement('input');
+  nameInputEl.maxLength=12;
+  nameInputEl.placeholder='Your name';
+  nameInputEl.style.cssText='position:absolute;z-index:11;font:600 14px Georgia,serif;'+
+    'padding:8px 12px;border-radius:3px;border:1.5px solid #C9A84C;'+
+    'background:#0D2818;color:#FAF6EE;text-align:center;width:150px;outline:none;';
+  submitBtnEl=document.createElement('button');
+  submitBtnEl.textContent='SUBMIT SCORE';
+  submitBtnEl.style.cssText='position:absolute;z-index:11;font:700 12px Georgia,serif;'+
+    'letter-spacing:.12em;text-transform:uppercase;padding:9px 16px;'+
+    'background:#6B2D8B;border:1.5px solid #8a3daf;color:#FAF6EE;'+
+    'border-radius:3px;cursor:pointer;outline:none;';
+  function go(e){e.preventDefault();submitArcadeScore();}
+  submitBtnEl.addEventListener('click',go);
+  submitBtnEl.addEventListener('touchstart',go,{passive:false});
+  document.getElementById('wrap').appendChild(nameInputEl);
+  document.getElementById('wrap').appendChild(submitBtnEl);
+  positionNameEntryUI();
+}
+function positionNameEntryUI(){
+  if(!nameInputEl)return;
+  var rect=canvas.getBoundingClientRect();
+  var cx=rect.left+GW/2*SC;
+  var cy=rect.top+(MC_PY+230)*SC;
+  nameInputEl.style.left=(cx-160)+'px';
+  nameInputEl.style.top=(cy-18)+'px';
+  submitBtnEl.style.left=cx+'px';
+  submitBtnEl.style.top=(cy-18)+'px';
+}
+function removeNameEntryUI(){
+  if(nameInputEl){nameInputEl.remove();nameInputEl=null;}
+  if(submitBtnEl){submitBtnEl.remove();submitBtnEl=null;}
+}
+function submitArcadeScore(){
+  var name=(nameInputEl.value||'Player').trim().slice(0,12)||'Player';
+  submitBtnEl.disabled=true;submitBtnEl.textContent='SUBMITTING…';
+  fetch(API_BASE+'/api/scores',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name,score:arcade.score})
+  }).then(function(r){return r.json();})
+    .then(function(){
+      arcadeSubmitted=true;removeNameEntryUI();
+      return fetchLeaderboard(10).then(function(data){leaderboardCache=data;});
+    }).catch(function(){
+      submitBtnEl.disabled=false;submitBtnEl.textContent='SUBMIT SCORE';
+    });
+}
+function showLeaderboard(){
+  STATE='leaderboard';menuDiv.style.display='none';
+  buildLeaderboardOverlay();
+  positionLeaderboardOverlay();
+  fetchAndRenderLeaderboard();
+}
+function hideLeaderboard(){
+  STATE='menu';removeLeaderboardOverlay();menuDiv.style.display='flex';
+}
+function buildLeaderboardOverlay(){
+  if(leaderboardDiv)return;
+  leaderboardDiv=document.createElement('div');
+  leaderboardDiv.style.cssText='position:absolute;z-index:11;width:340px;max-width:92vw;'+
+    'background:rgba(5,12,7,0.97);border:1.5px solid #6B2D8B;border-radius:8px;'+
+    'padding:18px 22px;font-family:Georgia,serif;color:#FAF6EE;text-align:center;';
+  leaderboardDiv.innerHTML='<div style="font:bold 20px Georgia,serif;color:#FAF6EE;'+
+    'border-bottom:2px solid #C9A84C;padding-bottom:8px;margin-bottom:10px;">LEADERBOARD</div>'+
+    '<div id="lbList" style="font:600 13px Georgia,serif;min-height:160px;">Loading…</div>'+
+    '<button id="lbBack" style="margin-top:14px;font:700 12px Georgia,serif;'+
+    'letter-spacing:.16em;text-transform:uppercase;padding:10px 28px;'+
+    'background:transparent;border:1.5px solid #6B2D8B;color:#FAF6EE;'+
+    'border-radius:3px;cursor:pointer;outline:none;">BACK</button>';
+  document.getElementById('wrap').appendChild(leaderboardDiv);
+  var back=leaderboardDiv.querySelector('#lbBack');
+  function go(e){e.preventDefault();hideLeaderboard();}
+  back.addEventListener('click',go);
+  back.addEventListener('touchstart',go,{passive:false});
+}
+function positionLeaderboardOverlay(){
+  if(!leaderboardDiv)return;
+  var rect=canvas.getBoundingClientRect();
+  leaderboardDiv.style.left=(rect.left+GW/2*SC-170)+'px';
+  leaderboardDiv.style.top=(rect.top+(CY+60)*SC)+'px';
+}
+function removeLeaderboardOverlay(){
+  if(leaderboardDiv){leaderboardDiv.remove();leaderboardDiv=null;}
+}
+function fetchAndRenderLeaderboard(){
+  fetchLeaderboard(10).then(function(data){
+    if(!leaderboardDiv)return;
+    var list=leaderboardDiv.querySelector('#lbList');
+    if(!data.length){list.textContent='No scores yet — be the first!';return;}
+    var rows=data.map(function(e,i){
+      var color=i===0?'#C9A84C':'#FAF6EE';
+      return '<div style="display:flex;justify-content:space-between;padding:4px 4px;color:'+color+';">'+
+        '<span>'+(i+1)+'. '+escapeHtml(e.name)+'</span><span>'+e.score+'</span></div>';
+    });
+    list.innerHTML=rows.join('');
+  }).catch(function(){
+    if(!leaderboardDiv)return;
+    leaderboardDiv.querySelector('#lbList').textContent='Failed to load leaderboard.';
+  });
 }
 
 // ── Input ─────────────────────────────────────
@@ -290,7 +451,12 @@ function drawSB(){
     var fc=col.isPoint?C.gold:i===cols.length-2?C.cream:'#666';
     Txt(col.v1+' – '+col.v2,cx,40,'600 20px Georgia,serif',fc);
   });
-  Txt(MODE==='1p'?'CPU':'2P',GW-30,SH/2,'500 9px Georgia,serif','#2d4535','right');
+  if(MODE==='1p'){
+    Txt('SCORE '+arcade.score,GW-30,SH/2-13,'700 11px Georgia,serif',C.gold,'right');
+    Txt('CPU',GW-30,SH/2+13,'500 9px Georgia,serif','#2d4535','right');
+  }else{
+    Txt('2P',GW-30,SH/2,'500 9px Georgia,serif','#2d4535','right');
+  }
 }
 
 function drawCourt(){
@@ -412,22 +578,23 @@ menuDiv.id='menuBtns';
 menuDiv.style.cssText='position:absolute;display:flex;gap:14px;left:50%;transform:translateX(-50%);z-index:10;';
 document.getElementById('wrap').appendChild(menuDiv);
 
-function mkBtn(label,mode){
+function mkBtn(label,onClick){
   var b=document.createElement('button');
   b.textContent=label;
   b.style.cssText='font:700 12px Georgia,serif;letter-spacing:.16em;text-transform:uppercase;'+
     'padding:14px 32px;background:transparent;border:1.5px solid #6B2D8B;color:#FAF6EE;'+
     'border-radius:3px;cursor:pointer;min-width:130px;outline:none;';
-  function go(e){e.preventDefault();startGame(mode);}
+  function go(e){e.preventDefault();onClick();}
   b.addEventListener('click',go);
   b.addEventListener('touchstart',go,{passive:false});
   return b;
 }
-menuDiv.appendChild(mkBtn('1 Player','1p'));
-menuDiv.appendChild(mkBtn('2 Players','2p'));
+menuDiv.appendChild(mkBtn('1 Player',function(){startGame('1p');}));
+menuDiv.appendChild(mkBtn('2 Players',function(){startGame('2p');}));
+menuDiv.appendChild(mkBtn('Leaderboard',showLeaderboard));
 
 function startGame(mode){
-  MODE=mode;sc=mkSc();
+  MODE=mode;sc=mkSc();arcade=mkArcade();
   menuDiv.style.display='none';
   var s2=document.getElementById('side2');
   if(s2)s2.style.opacity=mode==='2p'?'1':'0.3';
@@ -436,7 +603,9 @@ function startGame(mode){
   startPlaying();
 }
 function goMenu(){
-  STATE='menu';sc=mkSc();menuDiv.style.display='flex';
+  STATE='menu';sc=mkSc();arcade=mkArcade();
+  removeNameEntryUI();removeLeaderboardOverlay();
+  menuDiv.style.display='flex';
 }
 
 function inBtn(cx,cy){
@@ -493,7 +662,7 @@ function drawMatchEnd(){
   ctx.fillStyle='rgba(0,0,0,0.72)';ctx.fillRect(0,CY,GW,CH);
 
   // Card
-  var pw=500,ph=260,px=(GW-pw)/2,py=CY+(CH-ph)/2-10;
+  var pw=500,ph=MC_PH,px=(GW-pw)/2,py=MC_PY;
   ctx.fillStyle='rgba(5,12,7,0.97)';rrect(px,py,pw,ph,10);ctx.fill();
   ctx.strokeStyle=C.gold;ctx.lineWidth=1.8;rrect(px,py,pw,ph,10);ctx.stroke();
   // Gold top bar
@@ -515,6 +684,24 @@ function drawMatchEnd(){
     scoreStr+='   ('+parts.join('  '+String.fromCharCode(183)+'  ')+')';
   }
   Txt(scoreStr,GW/2,py+136,'italic 14px Georgia,serif',C.gold);
+
+  // Arcade score & leaderboard rank (1P only)
+  if(MODE==='1p'){
+    Txt('Arcade Score: '+arcade.score,GW/2,py+170,'600 16px Georgia,serif',C.gold);
+    if(leaderboardFetchState==='done'){
+      if(arcadeSubmitted){
+        Txt('Score submitted!',GW/2,py+196,'italic 13px Georgia,serif',C.cream);
+      }else{
+        var rank=leaderboardCache.findIndex(function(e){return arcade.score>e.score;});
+        var rankText = rank===-1
+          ? (leaderboardCache.length<10?'Top 10!':'Outside Top 10')
+          : 'Rank #'+(rank+1)+' on the leaderboard!';
+        Txt(rankText,GW/2,py+196,'italic 13px Georgia,serif',C.cream);
+      }
+    }else if(leaderboardFetchState==='loading'){
+      Txt('Loading leaderboard…',GW/2,py+196,'italic 12px Georgia,serif','#666');
+    }
+  }
 
   // Play Again button
   var bw=200,bh=44,bx=(GW-bw)/2,by=py+ph-66;
@@ -542,7 +729,7 @@ function tick(){
       case'pointEnd':
         if(--ptTimer<=0){
           if(ptNext==='setEnd'){STATE='setEnd';setEndTimer=180;}
-          else if(ptNext==='matchEnd'){STATE='matchEnd';}
+          else if(ptNext==='matchEnd'){STATE='matchEnd';onEnterMatchEnd();}
           else startPlaying();
         }
         drawPtEnd();break;
@@ -550,7 +737,9 @@ function tick(){
         if(--setEndTimer<=0)startPlaying();
         drawSetEnd();break;
       case'matchEnd':
-        drawMatchEnd();break;
+        drawMatchEnd();positionNameEntryUI();break;
+      case'leaderboard':
+        drawMenu();positionLeaderboardOverlay();break;
     }
   }catch(err){
     // Soft-catch rendering errors without crashing the loop
