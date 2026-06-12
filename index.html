@@ -8,7 +8,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{width:100%;height:100%;background:#050c07;overflow:hidden;touch-action:none;position:fixed;}
-#wrap{position:absolute;top:0;left:0;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;}
+#wrap{position:absolute;top:0;left:0;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;touch-action:none;}
 canvas{display:block;touch-action:none;}
 #touchUI{display:none;width:100%;flex-shrink:0;flex-direction:row;border-top:1px solid rgba(107,45,139,0.4);background:rgba(5,12,7,0.95);}
 #touchUI.show{display:flex;}
@@ -68,6 +68,7 @@ bindBtn('b2u','p2u'); bindBtn('b2d','p2d');
 
 // ── Canvas setup ──────────────────────────────
 var canvas=document.getElementById('c');
+var wrapEl=document.getElementById('wrap');
 var ctx=canvas.getContext('2d');
 var GW=900,GH=560,SH=64;
 var CY=SH,CH=GH-SH,NETX=GW/2,MG=16;
@@ -79,10 +80,16 @@ var TPAD_H=0;
 function resize(){
   TPAD_H=0;
   var vw=window.innerWidth,vh=window.innerHeight;
-  SC=Math.min(vw/GW,vh/GH);
   canvas.width=GW; canvas.height=GH;
-  canvas.style.width=(GW*SC)+'px';
-  canvas.style.height=(GH*SC)+'px';
+  if(isMobile){
+    canvas.style.width=vw+'px';
+    canvas.style.height=vh+'px';
+    SC=vw/GW;
+  }else{
+    SC=Math.min(vw/GW,vh/GH);
+    canvas.style.width=(GW*SC)+'px';
+    canvas.style.height=(GH*SC)+'px';
+  }
   var tui=document.getElementById('touchUI');
   if(tui)tui.classList.remove('show');
   if(typeof posMenuBtns==='function')posMenuBtns();
@@ -441,8 +448,9 @@ function showNameEntryUI(){
 function positionNameEntryUI(){
   if(!nameInputEl)return;
   var rect=canvas.getBoundingClientRect();
-  var cx=rect.left+GW/2*SC;
-  var cy=rect.top+(STATE==='arcadeResult'?(CY+CH/2+72)*SC:(MC_PY+230)*SC);
+  var cx=rect.left+rect.width/2;
+  var gameY=STATE==='arcadeResult'?CY+CH/2+72:MC_PY+230;
+  var cy=rect.top+gameY/GH*rect.height;
   nameInputEl.style.left=(cx-75)+'px';
   nameInputEl.style.top=(cy)+'px';
   submitBtnEl.style.left=(cx-75)+'px';
@@ -692,12 +700,19 @@ function inRect(cx,cy,r){
 
 function pointerToGame(clientX,clientY){
   var rect=canvas.getBoundingClientRect();
-  return{x:(clientX-rect.left)/SC,y:(clientY-rect.top)/SC};
+  if(!rect.width||!rect.height)return{x:GW/2,y:GH/2};
+  return{
+    x:(clientX-rect.left)/rect.width*GW,
+    y:(clientY-rect.top)/rect.height*GH
+  };
 }
 
-function playerFromX(x){
+function playerFromTouch(clientX){
+  var rect=canvas.getBoundingClientRect();
+  if(!rect.width)return MODE==='1p'?2:1;
+  var nx=(clientX-rect.left)/rect.width;
   if(MODE==='1p')return 2;
-  return x<NETX?1:2;
+  return nx<0.5?1:2;
 }
 
 function syncTouchDirections(){
@@ -715,20 +730,18 @@ function clearAllTouches(){
 }
 
 function handlePlayingTouchStart(touch){
-  var g=pointerToGame(touch.clientX,touch.clientY);
-  var player=playerFromX(g.x);
+  var player=playerFromTouch(touch.clientX);
   if(!player)return;
-  activeTouches[touch.identifier]={player:player,lastY:g.y,dir:0};
+  activeTouches[touch.identifier]={player:player,lastY:touch.clientY,dir:0};
   syncTouchDirections();
 }
 
 function handlePlayingTouchMove(touch){
   var entry=activeTouches[touch.identifier];
   if(!entry)return;
-  var g=pointerToGame(touch.clientX,touch.clientY);
-  var dy=g.y-entry.lastY;
-  entry.lastY=g.y;
-  entry.dir=dy<-1?-1:dy>1?1:0;
+  var dy=touch.clientY-entry.lastY;
+  entry.lastY=touch.clientY;
+  entry.dir=dy<-2?-1:dy>2?1:0;
   syncTouchDirections();
 }
 
@@ -984,26 +997,34 @@ function dismissArcadeLeaderboardFromPointer(clientX,clientY){
   hideArcadeLeaderboard();
   return true;
 }
-canvas.addEventListener('touchstart',function(e){
-  e.preventDefault();
-  if(handleCanvasPointer(e.changedTouches[0].clientX,e.changedTouches[0].clientY))return;
-  if(exitConfirmOpen||STATE==='splash')return;
-  if(isMobile&&STATE==='playing'){
-    for(var i=0;i<e.changedTouches.length;i++)handlePlayingTouchStart(e.changedTouches[i]);
-  }
-},{passive:false});
-canvas.addEventListener('touchmove',function(e){
-  e.preventDefault();
-  if(exitConfirmOpen||STATE!=='playing'||!isMobile)return;
-  for(var i=0;i<e.changedTouches.length;i++)handlePlayingTouchMove(e.changedTouches[i]);
-},{passive:false});
-canvas.addEventListener('touchend',function(e){
-  e.preventDefault();
-  for(var i=0;i<e.changedTouches.length;i++)handlePlayingTouchEnd(e.changedTouches[i].identifier);
-},{passive:false});
-canvas.addEventListener('touchcancel',function(e){
-  for(var i=0;i<e.changedTouches.length;i++)handlePlayingTouchEnd(e.changedTouches[i].identifier);
-},{passive:false});
+function isTouchUIControl(el){
+  return el&&el.closest&&(el.closest('#menuBtns')||el.closest('#touchUI')||el.closest('button')||el.closest('input'));
+}
+function bindGameTouch(el){
+  el.addEventListener('touchstart',function(e){
+    if(isTouchUIControl(e.target))return;
+    e.preventDefault();
+    if(handleCanvasPointer(e.changedTouches[0].clientX,e.changedTouches[0].clientY))return;
+    if(exitConfirmOpen||STATE==='splash')return;
+    if(isMobile&&STATE==='playing'){
+      for(var i=0;i<e.changedTouches.length;i++)handlePlayingTouchStart(e.changedTouches[i]);
+    }
+  },{passive:false});
+  el.addEventListener('touchmove',function(e){
+    if(isTouchUIControl(e.target))return;
+    e.preventDefault();
+    if(exitConfirmOpen||STATE!=='playing'||!isMobile)return;
+    for(var i=0;i<e.changedTouches.length;i++)handlePlayingTouchMove(e.changedTouches[i]);
+  },{passive:false});
+  el.addEventListener('touchend',function(e){
+    e.preventDefault();
+    for(var i=0;i<e.changedTouches.length;i++)handlePlayingTouchEnd(e.changedTouches[i].identifier);
+  },{passive:false});
+  el.addEventListener('touchcancel',function(e){
+    for(var i=0;i<e.changedTouches.length;i++)handlePlayingTouchEnd(e.changedTouches[i].identifier);
+  },{passive:false});
+}
+bindGameTouch(wrapEl);
 canvas.addEventListener('click',function(e){
   if(handleCanvasPointer(e.clientX,e.clientY))return;
 });
