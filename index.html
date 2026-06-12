@@ -74,25 +74,37 @@ var CY=SH,CH=GH-SH,NETX=GW/2,MG=16;
 var MC_PH=340,MC_PY=CY+(CH-MC_PH)/2-10;
 var SC=1;
 var isMobile=('ontouchstart' in window)||navigator.maxTouchPoints>0;
-var TPAD_H=isMobile?90:0;
+var TPAD_H=0;
+var touchPadOn=false;
 
-function resize(){
-  TPAD_H=isMobile?90:0;
+function layoutCanvas(){
   var vw=window.innerWidth,vh=window.innerHeight;
   var avH=vh-TPAD_H;
   SC=Math.min(vw/GW,avH/GH);
   canvas.width=GW; canvas.height=GH;
   canvas.style.width=(GW*SC)+'px';
   canvas.style.height=(GH*SC)+'px';
-  var tui=document.getElementById('touchUI');
-  if(isMobile){
-    tui.classList.add('show');
-    tui.style.height=TPAD_H+'px';
-  }else if(tui){
-    tui.classList.remove('show');
-  }
   if(typeof posMenuBtns==='function')posMenuBtns();
   if(typeof positionLeaderboardOverlay==='function')positionLeaderboardOverlay();
+}
+
+function syncTouchPad(forceLayout){
+  var show=isMobile&&STATE==='playing';
+  if(show!==touchPadOn){
+    touchPadOn=show;
+    TPAD_H=show?90:0;
+    var tui=document.getElementById('touchUI');
+    if(tui){
+      if(show){tui.classList.add('show');tui.style.height=TPAD_H+'px';}
+      else{tui.classList.remove('show');resetTouchFlags();}
+    }
+    forceLayout=true;
+  }
+  if(forceLayout)layoutCanvas();
+}
+
+function resize(){
+  syncTouchPad(true);
 }
 window.addEventListener('resize',resize);
 window.addEventListener('orientationchange',function(){setTimeout(resize,300);});
@@ -1052,6 +1064,7 @@ function drawMatchEnd(){
 function tick(){
   try{
     requestAnimationFrame(tick);
+    syncTouchPad();
     ctx.clearRect(0,0,GW,GH);
     switch(STATE){
       case'splash':
