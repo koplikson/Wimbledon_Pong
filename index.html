@@ -8,7 +8,7 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{width:100%;height:100%;background:#050c07;overflow:hidden;touch-action:none;position:fixed;}
-#wrap{position:absolute;top:0;left:0;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;touch-action:none;}
+#wrap{position:absolute;top:0;left:0;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;}
 canvas{display:block;touch-action:none;}
 #touchUI{display:none;width:100%;flex-shrink:0;flex-direction:row;border-top:1px solid rgba(107,45,139,0.4);background:rgba(5,12,7,0.95);}
 #touchUI.show{display:flex;}
@@ -68,30 +68,29 @@ bindBtn('b2u','p2u'); bindBtn('b2d','p2d');
 
 // ── Canvas setup ──────────────────────────────
 var canvas=document.getElementById('c');
-var wrapEl=document.getElementById('wrap');
 var ctx=canvas.getContext('2d');
 var GW=900,GH=560,SH=64;
 var CY=SH,CH=GH-SH,NETX=GW/2,MG=16;
 var MC_PH=340,MC_PY=CY+(CH-MC_PH)/2-10;
 var SC=1;
 var isMobile=('ontouchstart' in window)||navigator.maxTouchPoints>0;
-var TPAD_H=0;
+var TPAD_H=isMobile?90:0;
 
 function resize(){
-  TPAD_H=0;
+  TPAD_H=isMobile?90:0;
   var vw=window.innerWidth,vh=window.innerHeight;
+  var avH=vh-TPAD_H;
+  SC=Math.min(vw/GW,avH/GH);
   canvas.width=GW; canvas.height=GH;
-  if(isMobile){
-    canvas.style.width=vw+'px';
-    canvas.style.height=vh+'px';
-    SC=vw/GW;
-  }else{
-    SC=Math.min(vw/GW,vh/GH);
-    canvas.style.width=(GW*SC)+'px';
-    canvas.style.height=(GH*SC)+'px';
-  }
+  canvas.style.width=(GW*SC)+'px';
+  canvas.style.height=(GH*SC)+'px';
   var tui=document.getElementById('touchUI');
-  if(tui)tui.classList.remove('show');
+  if(isMobile){
+    tui.classList.add('show');
+    tui.style.height=TPAD_H+'px';
+  }else if(tui){
+    tui.classList.remove('show');
+  }
   if(typeof posMenuBtns==='function')posMenuBtns();
   if(typeof positionLeaderboardOverlay==='function')positionLeaderboardOverlay();
 }
@@ -283,7 +282,6 @@ var STATE='splash',MODE='1p';
 var exitConfirmOpen=false;
 var mobileMenuBtnRect=null;
 var exitConfirmRects=null;
-var activeTouches={};
 var ptTimer=0,ptMsg='',ptSub='',ptNext='playing',setEndTimer=0;
 var matchEndBtnRect=null;
 var leaderboardCache=null,leaderboardFetchState='idle',arcadeSubmitted=false;
@@ -448,9 +446,8 @@ function showNameEntryUI(){
 function positionNameEntryUI(){
   if(!nameInputEl)return;
   var rect=canvas.getBoundingClientRect();
-  var cx=rect.left+rect.width/2;
-  var gameY=STATE==='arcadeResult'?CY+CH/2+72:MC_PY+230;
-  var cy=rect.top+gameY/GH*rect.height;
+  var cx=rect.left+GW/2*SC;
+  var cy=rect.top+(STATE==='arcadeResult'?(CY+CH/2+72)*SC:(MC_PY+230)*SC);
   nameInputEl.style.left=(cx-75)+'px';
   nameInputEl.style.top=(cy)+'px';
   submitBtnEl.style.left=(cx-75)+'px';
@@ -700,57 +697,11 @@ function inRect(cx,cy,r){
 
 function pointerToGame(clientX,clientY){
   var rect=canvas.getBoundingClientRect();
-  if(!rect.width||!rect.height)return{x:GW/2,y:GH/2};
-  return{
-    x:(clientX-rect.left)/rect.width*GW,
-    y:(clientY-rect.top)/rect.height*GH
-  };
+  return{x:(clientX-rect.left)/SC,y:(clientY-rect.top)/SC};
 }
 
-function playerFromTouch(clientX){
-  var rect=canvas.getBoundingClientRect();
-  if(!rect.width)return MODE==='1p'?2:1;
-  var nx=(clientX-rect.left)/rect.width;
-  if(MODE==='1p')return 2;
-  return nx<0.5?1:2;
-}
-
-function applyMobileTouchDelta(player,dyScreen){
-  if(!dyScreen)return;
-  var rect=canvas.getBoundingClientRect();
-  if(!rect.height)return;
-  var dg=dyScreen/rect.height*GH;
-  if(MODE==='1p'){
-    if(player===2)movePads(dg,0);
-  }else if(player===1){
-    movePads(dg,0);
-  }else if(player===2){
-    movePads(0,dg);
-  }
-}
-
-function clearAllTouches(){
-  activeTouches={};
+function resetTouchFlags(){
   T.p1u=T.p1d=T.p2u=T.p2d=false;
-}
-
-function handlePlayingTouchStart(touch){
-  var player=playerFromTouch(touch.clientX);
-  if(!player)return;
-  activeTouches[touch.identifier]={player:player,lastY:touch.clientY};
-}
-
-function handlePlayingTouchMove(touch){
-  var entry=activeTouches[touch.identifier];
-  if(!entry)return;
-  var dy=touch.clientY-entry.lastY;
-  if(!dy)return;
-  entry.lastY=touch.clientY;
-  applyMobileTouchDelta(entry.player,dy);
-}
-
-function handlePlayingTouchEnd(id){
-  delete activeTouches[id];
 }
 
 function handleCanvasPointer(clientX,clientY){
@@ -977,7 +928,7 @@ function startGame(mode){
 function goMenu(){
   STATE='menu';sc=mkSc();arcade=mkArcade();streakPopup=null;
   lbArcadeMode=false;arcadeEndAt=0;
-  closeExitConfirm();clearAllTouches();
+  closeExitConfirm();resetTouchFlags();
   removeNameEntryUI();removeLeaderboardOverlay();
   menuDiv.style.display='flex';
   var s1=document.getElementById('side1');
@@ -1003,31 +954,11 @@ function dismissArcadeLeaderboardFromPointer(clientX,clientY){
 function isTouchUIControl(el){
   return el&&el.closest&&(el.closest('#menuBtns')||el.closest('#touchUI')||el.closest('button')||el.closest('input'));
 }
-function bindGameTouch(el){
-  el.addEventListener('touchstart',function(e){
-    if(isTouchUIControl(e.target))return;
-    e.preventDefault();
-    if(handleCanvasPointer(e.changedTouches[0].clientX,e.changedTouches[0].clientY))return;
-    if(exitConfirmOpen||STATE==='splash')return;
-    if(isMobile&&STATE==='playing'){
-      for(var i=0;i<e.changedTouches.length;i++)handlePlayingTouchStart(e.changedTouches[i]);
-    }
-  },{passive:false});
-  el.addEventListener('touchmove',function(e){
-    if(isTouchUIControl(e.target))return;
-    e.preventDefault();
-    if(exitConfirmOpen||STATE!=='playing'||!isMobile)return;
-    for(var i=0;i<e.changedTouches.length;i++)handlePlayingTouchMove(e.changedTouches[i]);
-  },{passive:false});
-  el.addEventListener('touchend',function(e){
-    e.preventDefault();
-    for(var i=0;i<e.changedTouches.length;i++)handlePlayingTouchEnd(e.changedTouches[i].identifier);
-  },{passive:false});
-  el.addEventListener('touchcancel',function(e){
-    for(var i=0;i<e.changedTouches.length;i++)handlePlayingTouchEnd(e.changedTouches[i].identifier);
-  },{passive:false});
-}
-bindGameTouch(wrapEl);
+canvas.addEventListener('touchstart',function(e){
+  if(isTouchUIControl(e.target))return;
+  e.preventDefault();
+  if(handleCanvasPointer(e.changedTouches[0].clientX,e.changedTouches[0].clientY))return;
+},{passive:false});
 canvas.addEventListener('click',function(e){
   if(handleCanvasPointer(e.clientX,e.clientY))return;
 });
