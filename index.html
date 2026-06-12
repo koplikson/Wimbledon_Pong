@@ -610,21 +610,25 @@ function drawSplash(){
   drawCourt();
   ctx.fillStyle='rgba(0,0,0,0.68)';ctx.fillRect(0,CY,GW,CH);
 
-  var margin=Math.max(20,GW*0.055);
+  var margin=Math.max(isMobile?14:20,GW*(isMobile?0.04:0.055));
   var pw=GW-margin*2;
-  var maxCardH=CH-28;
+  var maxCardH=CH-(isMobile?16:28);
   var body='V pátek po obědě a sobotu ráno bude prostor na trénink. Do té doby to piluj tady.';
-  var fontSize=17,logoR=Math.min(44,Math.round(GW/20));
-  var lines,lineH,ph,hintSize,bodyFont;
-  for(var n=0;n<6;n++){
+  var targetPx=isMobile?20:17;
+  var fontSize=Math.round(targetPx/Math.max(SC,0.35));
+  fontSize=Math.max(17,Math.min(fontSize,isMobile?44:22));
+  var logoR=isMobile?Math.min(36,Math.round(GW/24)):Math.min(44,Math.round(GW/20));
+  var lines,lineH,ph,hintSize,bodyFont,subSize;
+  for(var n=0;n<10;n++){
     bodyFont=fontSize+'px Georgia,serif';
     lines=wrapText(body,pw-margin*2,bodyFont);
-    lineH=fontSize*1.48;
-    hintSize=Math.max(10,fontSize-4);
-    ph=logoR*2+24+lines.length*lineH+hintSize+margin*1.4;
+    lineH=fontSize*(isMobile?1.36:1.48);
+    hintSize=Math.max(11,Math.round(fontSize*0.72));
+    subSize=Math.max(11,Math.round(fontSize*0.82));
+    ph=logoR*2+(isMobile?16:24)+subSize+8+lines.length*lineH+hintSize+margin*(isMobile?1.1:1.4);
     if(ph<=maxCardH)break;
-    fontSize-=2;
-    logoR=Math.max(30,logoR-4);
+    fontSize-=1;
+    logoR=Math.max(26,logoR-2);
   }
   ph=Math.min(ph,maxCardH);
   var px=(GW-pw)/2,py=CY+(CH-ph)/2;
@@ -633,15 +637,15 @@ function drawSplash(){
   ctx.strokeStyle=C.gold;ctx.lineWidth=1.8;rrect(px,py,pw,ph,10);ctx.stroke();
   ctx.fillStyle=C.gold;ctx.fillRect(px,py,pw,3);
 
-  var logoY=py+logoR+14;
+  var logoY=py+logoR+(isMobile?8:14);
   drawLogo(GW/2,logoY,logoR);
-  Txt('Wimbledon Edition',GW/2,logoY+logoR+16,'italic '+Math.max(11,fontSize-3)+'px Georgia,serif',C.gold);
+  Txt('Wimbledon Edition',GW/2,logoY+logoR+(isMobile?10:16),'italic '+subSize+'px Georgia,serif',C.gold);
 
-  var startY=logoY+logoR+34;
+  var startY=logoY+logoR+(isMobile?22:34);
   lines.forEach(function(ln,i){
     Txt(ln,GW/2,startY+i*lineH,bodyFont,C.cream);
   });
-  Txt('Klepni pro pokračování',GW/2,py+ph-margin*0.55,'italic '+hintSize+'px Georgia,serif',C.purpleL);
+  Txt('Klepni pro pokračování',GW/2,py+ph-margin*0.5,'italic '+hintSize+'px Georgia,serif',C.purpleL);
 }
 
 function drawMobileMenuBtn(){
