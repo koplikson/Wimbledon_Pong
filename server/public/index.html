@@ -696,7 +696,7 @@ function pointerToGame(clientX,clientY){
 }
 
 function playerFromX(x){
-  if(MODE==='1p')return x>=NETX?2:0;
+  if(MODE==='1p')return 2;
   return x<NETX?1:2;
 }
 
@@ -716,7 +716,6 @@ function clearAllTouches(){
 
 function handlePlayingTouchStart(touch){
   var g=pointerToGame(touch.clientX,touch.clientY);
-  if(g.y<CY)return;
   var player=playerFromX(g.x);
   if(!player)return;
   activeTouches[touch.identifier]={player:player,lastY:g.y,dir:0};
