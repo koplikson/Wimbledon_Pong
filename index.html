@@ -618,14 +618,16 @@ function drawSplash(){
   var fontSize=Math.round(targetPx/Math.max(SC,0.35));
   fontSize=Math.max(17,Math.min(fontSize,isMobile?44:22));
   var logoR=isMobile?Math.min(36,Math.round(GW/24)):Math.min(44,Math.round(GW/20));
-  var lines,lineH,ph,hintSize,bodyFont,subSize;
+  var lines,lineH,ph,hintSize,bodyFont,subSize,headerH,bodyBlockH;
   for(var n=0;n<10;n++){
     bodyFont=fontSize+'px Georgia,serif';
     lines=wrapText(body,pw-margin*2,bodyFont);
     lineH=fontSize*(isMobile?1.36:1.48);
     hintSize=Math.max(11,Math.round(fontSize*0.72));
     subSize=Math.max(11,Math.round(fontSize*0.82));
-    ph=logoR*2+(isMobile?16:24)+subSize+8+lines.length*lineH+hintSize+margin*(isMobile?1.1:1.4);
+    bodyBlockH=lines.length*lineH;
+    headerH=logoR*2+subSize+(isMobile?22:30);
+    ph=headerH+bodyBlockH+hintSize+margin*(isMobile?1.6:1.9);
     if(ph<=maxCardH)break;
     fontSize-=1;
     logoR=Math.max(26,logoR-2);
@@ -637,15 +639,20 @@ function drawSplash(){
   ctx.strokeStyle=C.gold;ctx.lineWidth=1.8;rrect(px,py,pw,ph,10);ctx.stroke();
   ctx.fillStyle=C.gold;ctx.fillRect(px,py,pw,3);
 
-  var logoY=py+logoR+(isMobile?8:14);
+  var logoY=py+margin*0.45+logoR;
   drawLogo(GW/2,logoY,logoR);
-  Txt('Wimbledon Edition',GW/2,logoY+logoR+(isMobile?10:16),'italic '+subSize+'px Georgia,serif',C.gold);
+  var subY=logoY+logoR+(isMobile?10:14);
+  Txt('Wimbledon Edition',GW/2,subY,'italic '+subSize+'px Georgia,serif',C.gold);
 
-  var startY=logoY+logoR+(isMobile?22:34);
+  var headerBottom=subY+subSize*0.6+(isMobile?10:14);
+  var hintY=py+ph-margin*0.45;
+  var bodyTop=headerBottom;
+  var bodyBottom=hintY-hintSize*0.6-(isMobile?8:10);
+  var startY=bodyTop+(bodyBottom-bodyTop-bodyBlockH)/2+lineH/2;
   lines.forEach(function(ln,i){
-    Txt(ln,GW/2,startY+i*lineH,bodyFont,C.cream);
+    Txt(ln,GW/2,startY+i*lineH,bodyFont,C.cream,'center');
   });
-  Txt('Klepni pro pokračování',GW/2,py+ph-margin*0.5,'italic '+hintSize+'px Georgia,serif',C.purpleL);
+  Txt('Klepni pro pokračování',GW/2,hintY,'italic '+hintSize+'px Georgia,serif',C.purpleL,'center');
 }
 
 function drawMobileMenuBtn(){
