@@ -1,11 +1,12 @@
 # Wimbledon Pong — Leaderboard API
 
-Small Node/Express + PostgreSQL API backing the arcade-score leaderboard for
-the 1-player game. Stores high scores in a single `scores` table
-(`name`, `score`, `created_at`) and serves the top entries.
+Small Node/Express + PostgreSQL service for the arcade-score leaderboard and the
+Mixed Doubles Pong game UI. Stores high scores in a single `scores` table
+(`name`, `score`, `created_at`) and serves the game at `/`.
 
 ## Endpoints
 
+- `GET /` — game UI (`server/public/index.html`)
 - `GET /health` — health check, returns `{ ok: true }`.
 - `GET /api/scores?limit=10` — top scores, highest first.
 - `POST /api/scores` — submit a score: `{ "name": "Tom", "score": 120 }`.
@@ -21,19 +22,26 @@ npm install
 npm run dev
 ```
 
-## Deploying to Railway
+Open http://localhost:3000/ for the game. API calls use same-origin (`API_BASE=''`).
+
+## Deploying to Railway (Svatba project)
+
+This service lives in the **Svatba** Railway project alongside the wedding site.
+Staging URL: https://wimbledon-pong-staging.up.railway.app/
 
 ```
-railway login
-railway init
-railway add -d postgres        # provisions Postgres, sets DATABASE_URL on linked services
-railway up                      # deploy this directory
-railway variables --set CORS_ORIGIN=<frontend origin>
-railway domain                  # generate a public URL -> use as API_BASE in index.html
+cd server
+railway link --project Svatba --environment staging
+railway service link wimbledon-pong
+railway up --detach -m "deploy message"
 ```
 
-`railway.toml` configures the build/start/healthcheck settings; `PORT` and
-`DATABASE_URL` are provided automatically by Railway.
+Postgres and `DATABASE_URL` are provisioned as separate services in the same
+environment. The wedding site (`koplikson/Svatba`) links to this URL with a
+**Play Pong** button — no pong code in that repo.
+
+`railway.toml` configures build/start/healthcheck; `PORT` and `DATABASE_URL` are
+provided by Railway.
 
 ## Known limitation
 
