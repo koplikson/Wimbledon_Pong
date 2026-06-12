@@ -18,6 +18,9 @@ canvas{display:block;touch-action:none;}
 .tbtn{flex:1;display:flex;align-items:center;justify-content:center;font:700 22px Georgia,serif;color:rgba(250,246,238,0.4);background:none;border:none;outline:none;cursor:pointer;padding:0;min-height:44px;}
 .tbtn.pressed,.tbtn:active{background:rgba(107,45,139,0.5);color:rgba(250,246,238,1);}
 .tmid{width:2px;background:rgba(107,45,139,0.35);flex-shrink:0;}
+#menuBtns{position:absolute;display:flex;flex-direction:row;align-items:center;gap:14px;left:50%;transform:translateX(-50%);z-index:10;}
+#menuBtns.menuBtns--stack{flex-direction:column;width:min(calc(100vw - 32px),280px);align-items:stretch;}
+#menuBtns.menuBtns--stack button{width:100%;min-width:0;padding:12px 16px;}
 </style>
 </head>
 <body>
@@ -898,7 +901,6 @@ function panel(title,sub,foot){
 // ── Menu DOM buttons ──────────────────────────
 var menuDiv=document.createElement('div');
 menuDiv.id='menuBtns';
-menuDiv.style.cssText='position:absolute;display:flex;gap:14px;left:50%;transform:translateX(-50%);z-index:10;';
 document.getElementById('wrap').appendChild(menuDiv);
 
 function mkBtn(label,onClick,variant){
@@ -1001,6 +1003,8 @@ function posMenuBtns(){
   if(!menuDiv)return;
   menuDiv.style.top='auto';
   menuDiv.style.bottom=(TPAD_H+16)+'px';
+  if(window.innerWidth<520)menuDiv.classList.add('menuBtns--stack');
+  else menuDiv.classList.remove('menuBtns--stack');
 }
 
 function drawMenu(){
