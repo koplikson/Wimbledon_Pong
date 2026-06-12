@@ -715,13 +715,18 @@ function playerFromTouch(clientX){
   return nx<0.5?1:2;
 }
 
-function syncTouchDirections(){
-  T.p1u=T.p1d=T.p2u=T.p2d=false;
-  Object.keys(activeTouches).forEach(function(id){
-    var t=activeTouches[id];
-    if(t.player===1){if(t.dir<0)T.p1u=true;if(t.dir>0)T.p1d=true;}
-    else if(t.player===2){if(t.dir<0)T.p2u=true;if(t.dir>0)T.p2d=true;}
-  });
+function applyMobileTouchDelta(player,dyScreen){
+  if(!dyScreen)return;
+  var rect=canvas.getBoundingClientRect();
+  if(!rect.height)return;
+  var dg=dyScreen/rect.height*GH;
+  if(MODE==='1p'){
+    if(player===2)movePads(dg,0);
+  }else if(player===1){
+    movePads(dg,0);
+  }else if(player===2){
+    movePads(0,dg);
+  }
 }
 
 function clearAllTouches(){
@@ -732,22 +737,20 @@ function clearAllTouches(){
 function handlePlayingTouchStart(touch){
   var player=playerFromTouch(touch.clientX);
   if(!player)return;
-  activeTouches[touch.identifier]={player:player,lastY:touch.clientY,dir:0};
-  syncTouchDirections();
+  activeTouches[touch.identifier]={player:player,lastY:touch.clientY};
 }
 
 function handlePlayingTouchMove(touch){
   var entry=activeTouches[touch.identifier];
   if(!entry)return;
   var dy=touch.clientY-entry.lastY;
+  if(!dy)return;
   entry.lastY=touch.clientY;
-  entry.dir=dy<-2?-1:dy>2?1:0;
-  syncTouchDirections();
+  applyMobileTouchDelta(entry.player,dy);
 }
 
 function handlePlayingTouchEnd(id){
   delete activeTouches[id];
-  syncTouchDirections();
 }
 
 function handleCanvasPointer(clientX,clientY){
