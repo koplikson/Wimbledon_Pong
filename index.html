@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Mixed Doubles Pong — Wimbledon</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{width:100%;height:100%;background:#050c07;overflow:hidden;touch-action:none;position:fixed;}
@@ -106,10 +103,6 @@ var C={
   purple:'#6B2D8B',purpleL:'#8a3daf',gold:'#C9A84C',
   sbBg:'#07100a',lineA:'rgba(255,255,255,0.28)',lineB:'rgba(255,255,255,0.10)',
   ball:'#c8e32b'
-};
-var W={
-  cream:'#FAF6EE',ivory:'#FFFDF8',green:'#1A4D2E',purple:'#6B2D8B',
-  gold:'#B8960C',warmGrey:'#6B6860',border:'#D4C9B8'
 };
 
 // ── Scoring ───────────────────────────────────
@@ -608,22 +601,44 @@ function dismissSplash(){
 }
 
 function drawSplash(){
-  ctx.fillStyle=W.cream;ctx.fillRect(0,0,GW,GH);
-  var sh=7;
-  ctx.fillStyle=W.green;ctx.fillRect(0,0,GW/2,sh);
-  ctx.fillStyle=W.purple;ctx.fillRect(GW/2,0,GW/2,sh);
-  var pw=520,ph=280,px=(GW-pw)/2,py=(GH-ph)/2-10;
-  ctx.fillStyle=W.ivory;rrect(px,py,pw,ph,10);ctx.fill();
-  ctx.strokeStyle=W.border;ctx.lineWidth=1;rrect(px,py,pw,ph,10);ctx.stroke();
-  ctx.fillStyle=W.green;ctx.fillRect(px,py,pw,4);
-  drawLogo(GW/2,py+52,32);
+  ctx.fillStyle=C.sbBg;ctx.fillRect(0,0,GW,SH);
+  ctx.fillStyle=C.purple;ctx.fillRect(0,SH-2,GW,2);
+  drawLogo(30,SH/2,22);
+  drawCourt();
+  ctx.fillStyle='rgba(0,0,0,0.68)';ctx.fillRect(0,CY,GW,CH);
+
+  var margin=Math.max(20,GW*0.055);
+  var pw=GW-margin*2;
+  var maxCardH=CH-28;
   var body='V pátek po obědě a sobotu ráno bude prostor na trénink. Do té doby to piluj tady.';
-  var lines=wrapText(body,pw-56,'16px "Libre Baskerville",Georgia,serif');
-  var startY=py+108,lineH=26;
+  var fontSize=17,logoR=Math.min(44,Math.round(GW/20));
+  var lines,lineH,ph,hintSize,bodyFont;
+  for(var n=0;n<6;n++){
+    bodyFont=fontSize+'px Georgia,serif';
+    lines=wrapText(body,pw-margin*2,bodyFont);
+    lineH=fontSize*1.48;
+    hintSize=Math.max(10,fontSize-4);
+    ph=logoR*2+24+lines.length*lineH+hintSize+margin*1.4;
+    if(ph<=maxCardH)break;
+    fontSize-=2;
+    logoR=Math.max(30,logoR-4);
+  }
+  ph=Math.min(ph,maxCardH);
+  var px=(GW-pw)/2,py=CY+(CH-ph)/2;
+
+  ctx.fillStyle='rgba(5,12,7,0.97)';rrect(px,py,pw,ph,10);ctx.fill();
+  ctx.strokeStyle=C.gold;ctx.lineWidth=1.8;rrect(px,py,pw,ph,10);ctx.stroke();
+  ctx.fillStyle=C.gold;ctx.fillRect(px,py,pw,3);
+
+  var logoY=py+logoR+14;
+  drawLogo(GW/2,logoY,logoR);
+  Txt('Wimbledon Edition',GW/2,logoY+logoR+16,'italic '+Math.max(11,fontSize-3)+'px Georgia,serif',C.gold);
+
+  var startY=logoY+logoR+34;
   lines.forEach(function(ln,i){
-    Txt(ln,GW/2,startY+i*lineH,'16px "Libre Baskerville",Georgia,serif',W.green);
+    Txt(ln,GW/2,startY+i*lineH,bodyFont,C.cream);
   });
-  Txt('Klepni pro pokračování',GW/2,py+ph-28,'italic 13px "Libre Baskerville",Georgia,serif',W.warmGrey);
+  Txt('Klepni pro pokračování',GW/2,py+ph-margin*0.55,'italic '+hintSize+'px Georgia,serif',C.purpleL);
 }
 
 function drawMobileMenuBtn(){
@@ -642,17 +657,18 @@ function closeExitConfirm(){exitConfirmOpen=false;exitConfirmRects=null;}
 function drawExitConfirm(){
   if(!exitConfirmOpen)return;
   ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(0,0,GW,GH);
-  var pw=320,ph=160,px=(GW-pw)/2,py=(GH-ph)/2;
-  ctx.fillStyle=W.ivory;rrect(px,py,pw,ph,10);ctx.fill();
-  ctx.strokeStyle=W.border;ctx.lineWidth=1;rrect(px,py,pw,ph,10);ctx.stroke();
-  ctx.fillStyle=W.green;ctx.fillRect(px,py,pw,4);
-  Txt('Opustit hru?',GW/2,py+48,'700 22px "Playfair Display",Georgia,serif',W.green);
-  var btnW=100,btnH=38,gap=16,btnY=py+ph-58;
+  var pw=Math.min(320,GW-48),ph=160,px=(GW-pw)/2,py=(GH-ph)/2;
+  ctx.fillStyle='rgba(5,12,7,0.97)';rrect(px,py,pw,ph,10);ctx.fill();
+  ctx.strokeStyle=C.gold;ctx.lineWidth=1.8;rrect(px,py,pw,ph,10);ctx.stroke();
+  ctx.fillStyle=C.gold;ctx.fillRect(px,py,pw,3);
+  Txt('Opustit hru?',GW/2,py+48,'700 22px Georgia,serif',C.cream);
+  var btnW=Math.min(100,(pw-48)/2-8),btnH=38,gap=16,btnY=py+ph-58;
   var yesX=GW/2-gap/2-btnW,noX=GW/2+gap/2;
-  ctx.fillStyle=W.purple;rrect(yesX,btnY,btnW,btnH,5);ctx.fill();
-  Txt('Ano',yesX+btnW/2,btnY+btnH/2,'700 12px Georgia,serif',W.cream);
-  ctx.strokeStyle=W.green;ctx.lineWidth=1.5;rrect(noX,btnY,btnW,btnH,5);ctx.stroke();
-  Txt('Ne',noX+btnW/2,btnY+btnH/2,'700 12px Georgia,serif',W.green);
+  ctx.fillStyle='rgba(107,45,139,0.85)';rrect(yesX,btnY,btnW,btnH,5);ctx.fill();
+  ctx.strokeStyle=C.purpleL;ctx.lineWidth=1.2;rrect(yesX,btnY,btnW,btnH,5);ctx.stroke();
+  Txt('Ano',yesX+btnW/2,btnY+btnH/2,'700 12px Georgia,serif',C.cream);
+  ctx.strokeStyle=C.purpleL;ctx.lineWidth=1.5;rrect(noX,btnY,btnW,btnH,5);ctx.stroke();
+  Txt('Ne',noX+btnW/2,btnY+btnH/2,'700 12px Georgia,serif',C.cream);
   exitConfirmRects={yes:{x:yesX,y:btnY,w:btnW,h:btnH},no:{x:noX,y:btnY,w:btnW,h:btnH}};
 }
 
